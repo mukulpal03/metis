@@ -8,13 +8,13 @@ const app = express();
 
 app.use(
   cors({
-    origin: "http://localhost:3001",
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: [process.env.FRONTEND_URL || "http://localhost:3001", "http://127.0.0.1:3001"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   })
 );
 
-app.all("/api/auth/*", toNodeHandler(auth));
+app.all("/api/auth/*splat", toNodeHandler(auth));
 
 app.use(express.json());
 
