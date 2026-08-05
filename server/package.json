@@ -15,14 +15,19 @@
   "license": "ISC",
   "packageManager": "pnpm@10.33.2",
   "dependencies": {
+    "@clack/prompts": "^1.7.0",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "better-auth": "^1.6.26",
+    "boxen": "^8.0.1",
+    "chalk": "^6.0.0",
+    "commander": "^15.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "pg": "^8.22.0",
-    "prisma": "^7.9.1"
+    "prisma": "^7.9.1",
+    "yocto-spinner": "^1.2.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
