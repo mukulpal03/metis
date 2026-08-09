@@ -144,3 +144,95 @@ export function getEnabledTools(
     return undefined;
   }
 }
+
+/**
+ * Toggle a tool's enabled state by ID.
+ */
+export function toggleTool(toolId: string, targetProvider?: string): boolean {
+  const tool = availableTools.find((t) => t.id === toolId);
+  if (tool) {
+    if (
+      targetProvider &&
+      tool.provider &&
+      tool.provider !== "all" &&
+      tool.provider !== targetProvider.toLowerCase()
+    ) {
+      console.log(
+        chalk.yellow(
+          `[DEBUG] Tool ${toolId} (${tool.provider}) is not compatible with active provider ${targetProvider}`,
+        ),
+      );
+    }
+    tool.enabled = !tool.enabled;
+    console.log(
+      chalk.gray(`[DEBUG] Tool ${toolId} toggled to ${tool.enabled}`),
+    );
+    return tool.enabled;
+  }
+  console.log(chalk.red(`[DEBUG] Tool ${toolId} not found`));
+  return false;
+}
+
+/**
+ * Enable a list of tool IDs (disables any tools not in the provided array)
+ */
+export function enableTools(toolIds: string[]): void {
+  console.log(chalk.gray("[DEBUG] enableTools called with:"), toolIds);
+
+  availableTools.forEach((tool) => {
+    const wasEnabled = tool.enabled;
+    tool.enabled = toolIds.includes(tool.id);
+
+    if (tool.enabled !== wasEnabled) {
+      console.log(
+        chalk.gray(`[DEBUG] ${tool.id}: ${wasEnabled} → ${tool.enabled}`),
+      );
+    }
+  });
+
+  const enabledCount = availableTools.filter((t) => t.enabled).length;
+  console.log(
+    chalk.gray(
+      `[DEBUG] Total tools enabled: ${enabledCount}/${availableTools.length}`,
+    ),
+  );
+}
+
+/**
+ * Get all enabled tool names (optionally filtered by provider)
+ */
+export function getEnabledToolNames(provider?: string): string[] {
+  const targetProvider = provider?.toLowerCase();
+  const names = availableTools
+    .filter((t) => {
+      if (!t.enabled) return false;
+      if (
+        targetProvider &&
+        t.provider &&
+        t.provider !== "all" &&
+        t.provider !== targetProvider
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .map((t) => t.name);
+
+  console.log(
+    chalk.gray(
+      `[DEBUG] getEnabledToolNames (${provider || "all"}) returning:`,
+    ),
+    names,
+  );
+  return names;
+}
+
+/**
+ * Reset all tools (disable all)
+ */
+export function resetTools(): void {
+  availableTools.forEach((tool) => {
+    tool.enabled = false;
+  });
+  console.log(chalk.gray("[DEBUG] All tools have been reset (disabled)"));
+}

@@ -8,6 +8,8 @@ import {
 import chalk from "chalk";
 import { ProviderFactory, type ResolvedModel } from "./providers";
 
+import { getEnabledTools } from "../../config/tools";
+
 export interface AIServiceResponse {
   content: string;
   finishReason: FinishReason;
@@ -46,8 +48,10 @@ export class AIService {
         messages: messages,
       };
 
-      if (tools && Object.keys(tools).length > 0) {
-        streamConfig.tools = tools;
+      const activeTools = tools || getEnabledTools(this.resolvedModel.providerName);
+
+      if (activeTools && Object.keys(activeTools).length > 0) {
+        streamConfig.tools = activeTools;
         streamConfig.maxSteps = 5; // Allow up to 5 tool call steps
       }
 
