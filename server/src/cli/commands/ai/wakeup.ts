@@ -6,6 +6,8 @@ import { db } from "../../../lib/db";
 import { getStoredToken, isTokenExpired, requireAuth } from "../../../lib/token";
 import { startChat } from "../../chat/chat";
 import { startToolChat } from "../../chat/tool-chat";
+import { startAgentChat } from "../../chat/agent-chat";
+
 
 export async function wakeupAction() {
   // Ensure user is authenticated before proceeding
@@ -56,7 +58,7 @@ export async function wakeupAction() {
         {
           label: "🤖 Agentic Mode",
           value: "agentic",
-          hint: "Coming soon",
+          hint: "Autonomous coding & application generator",
         },
         {
           label: "❌ Exit Metis",
@@ -79,7 +81,7 @@ export async function wakeupAction() {
         await startToolChat();
         break;
       case "agentic":
-        console.log(chalk.yellow("\nℹ️  Agentic mode coming soon\n"));
+        await startAgentChat();
         break;
     }
   }

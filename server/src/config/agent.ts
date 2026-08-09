@@ -1,7 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
 import chalk from "chalk";
-import boxen from "boxen";
 import yoctoSpinner from "yocto-spinner";
 import { generateObject } from "ai";
 import { z } from "zod";
@@ -16,15 +15,25 @@ export const ApplicationSchema = z.object({
   files: z
     .array(
       z.object({
-        path: z.string().describe("Relative file path (e.g., src/App.jsx)"),
-        content: z.string().describe("Complete file content"),
+        path: z
+          .string()
+          .describe(
+            "Relative file path (e.g. index.html, styles.css, script.js, src/App.jsx)",
+          ),
+        content: z
+          .string()
+          .describe(
+            "Complete code content for this file. MUST NOT be empty or missing logic.",
+          ),
       }),
     )
-    .describe("All files needed for the application"),
+    .describe(
+      "Array of all project files. MANDATORY FOR WEB APPS: You MUST include index.html, styles.css, AND script.js (or main.js/ts). DO NOT OMIT script.js!",
+    ),
   setupCommands: z
     .array(z.string())
     .describe(
-      "Bash commands to setup and run (e.g., npm install, npm run dev)",
+      "Bash commands to setup and run (e.g., npm install, npm run dev, or open index.html)",
     ),
 });
 
@@ -118,21 +127,13 @@ export async function generateApplication(
   const providerInfo = aiService.getProviderInfo();
   const providerBadge = `${providerInfo.providerName.toUpperCase()} (${providerInfo.modelName})`;
 
-  const agentHeaderBox = boxen(
-    `${chalk.bold.hex("#89B4FA")("🤖 Metis Agent Mode")}\n` +
-      `${chalk.gray("Request:")} ${chalk.bold.white(description)}\n` +
-      `${chalk.gray("Provider:")} ${chalk.cyan(providerBadge)}`,
-    {
-      padding: 1,
-      margin: { top: 1, bottom: 1 },
-      borderStyle: "round",
-      borderColor: "#89B4FA",
-    },
+  printSystem(
+    chalk.hex("#89B4FA")("\n🤖 Agent Mode: Generating your application...\n"),
   );
-  printSystem(agentHeaderBox);
+  printSystem(chalk.gray(`Request: ${description}\n`));
 
   const spinner = yoctoSpinner({
-    text: chalk.hex("#89B4FA")("Generating structured application output..."),
+    text: chalk.hex("#89B4FA")("Building application structure and files..."),
   }).start();
 
   try {
@@ -140,32 +141,97 @@ export async function generateApplication(
 
     const result = await generateObject({
       model: languageModel,
+      system: `You are an expert autonomous software engineering agent.
+Your mission is to generate 100% complete, fully working production-ready applications.
+
+CRITICAL INSTRUCTION FOR WEB APPLICATIONS:
+1. ALWAYS generate separate, dedicated files for each layer:
+   - index.html (HTML structure with <link rel="stylesheet" href="styles.css"> and <script src="script.js" defer></script>)
+   - styles.css (Polished, modern CSS styling with flexbox/grid, dynamic animations, and vibrant styling)
+   - script.js (FULL interactive JavaScript code: event listeners, game state, DOM manipulation, storage logic, etc.)
+   - README.md (Setup instructions)
+2. ABSOLUTELY NEVER omit the JavaScript logic file (script.js). A web application without a separate JavaScript file containing interactive logic is broken and UNACCEPTABLE.
+3. Write clean, complete code with ZERO placeholders, ZERO TODOs, and ZERO truncated logic.`,
       schema: ApplicationSchema,
       prompt: `Create a complete, production-ready application for: ${description}
 
-CRITICAL REQUIREMENTS:
-1. Generate ALL files needed for the application to run
-2. Include package.json with ALL dependencies and correct versions (if needed)
-3. Include README.md with setup instructions
-4. Include configuration files (.gitignore, etc.) if needed
-5. Write clean, well-commented, production-ready code
-6. Include error handling and input validation
-7. Use modern JavaScript/TypeScript best practices
-8. Make sure all imports and paths are correct
-9. NO PLACEHOLDERS - everything must be complete and working
-10. For simple HTML/CSS/JS projects, you can skip package.json if not needed
-
 Provide:
 - A meaningful kebab-case folder name
-- All necessary files with complete content
-- Setup commands (for example: cd folder, npm install, npm run dev OR just open index.html)
-- Make it visually appealing and functional`,
+- All necessary files with complete content (index.html, styles.css, script.js, README.md, package.json if needed)
+- Setup commands (for example: "Open index.html in browser" OR "cd <folder> && npm install && npm run dev")`,
     });
 
     const application = result.object;
-    spinner.success(
-      `Generated application structure for ${chalk.bold.hex("#A6E3A1")(application.folderName)}`,
+
+    if (!application.files || application.files.length === 0) {
+      throw new Error("No files were generated");
+    }
+
+    // Safety check: Enforce JS file creation for HTML web projects
+    const hasHtml = application.files.some((f) => f.path.endsWith(".html"));
+    const hasScript = application.files.some(
+      (f) =>
+        f.path.endsWith(".js") ||
+        f.path.endsWith(".ts") ||
+        f.path.endsWith(".jsx") ||
+        f.path.endsWith(".tsx"),
     );
+
+    if (hasHtml && !hasScript) {
+      spinner.text = chalk.hex("#89B4FA")(
+        "Generating missing JavaScript logic file (script.js)...",
+      );
+
+      const scriptResult = await generateObject({
+        model: languageModel,
+        schema: z.object({
+          filename: z
+            .string()
+            .describe("The filename for the script, e.g. script.js"),
+          content: z
+            .string()
+            .describe(
+              "Complete, full-featured interactive JavaScript code with event listeners and logic",
+            ),
+        }),
+        prompt: `Write the complete, interactive JavaScript code (script.js) for the following application request: "${description}".
+Existing HTML/CSS code:
+${application.files.map((f) => `--- ${f.path} ---\n${f.content}`).join("\n\n")}
+
+CRITICAL: Implement all interactive logic, DOM manipulation, event listeners, state updates, winning/reset logic, and dynamic controls!`,
+      });
+
+      if (scriptResult.object?.content) {
+        const scriptFileName = scriptResult.object.filename || "script.js";
+        application.files.push({
+          path: scriptFileName,
+          content: scriptResult.object.content,
+        });
+
+        // Ensure index.html references the script file
+        const htmlIndex = application.files.findIndex((f) =>
+          f.path.endsWith(".html"),
+        );
+        if (
+          htmlIndex !== -1 &&
+          !application.files[htmlIndex].content.includes(scriptFileName)
+        ) {
+          if (application.files[htmlIndex].content.includes("</body>")) {
+            application.files[htmlIndex].content = application.files[
+              htmlIndex
+            ].content.replace(
+              "</body>",
+              `  <script src="${scriptFileName}" defer></script>\n</body>`,
+            );
+          } else {
+            application.files[htmlIndex].content +=
+              `\n<script src="${scriptFileName}" defer></script>`;
+          }
+        }
+      }
+    }
+
+    spinner.success("Structured application generated successfully!");
 
     printSystem(
       chalk.hex("#A6E3A1")(`\n✅ Generated: ${application.folderName}\n`),
@@ -190,17 +256,10 @@ Provide:
     );
 
     // Display results
-    const successBox = boxen(
-      `${chalk.bold.hex("#A6E3A1")("✨ Application created successfully!")}\n\n` +
-        `${chalk.gray("📁 Location:")} ${chalk.bold.cyan(appDir)}`,
-      {
-        padding: 1,
-        margin: { top: 1, bottom: 1 },
-        borderStyle: "round",
-        borderColor: "#A6E3A1",
-      },
+    printSystem(
+      chalk.bold.hex("#A6E3A1")("\n✨ Application created successfully!\n"),
     );
-    printSystem(successBox);
+    printSystem(chalk.hex("#89B4FA")(`📁 Location: ${chalk.bold(appDir)}\n`));
 
     // Display setup commands
     if (application.setupCommands && application.setupCommands.length > 0) {
