@@ -22,4 +22,6 @@ export const openaiApiKey = config.openaiApiKey;
 export const openaiModelName = config.model || "gpt-4o-mini";
 
 export * from "./tools";
+export * from "./agent";
+
 

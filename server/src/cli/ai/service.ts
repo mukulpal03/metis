@@ -33,6 +33,11 @@ export class AIService {
     };
   }
 
+  public getLanguageModel() {
+    return this.resolvedModel.model;
+  }
+
+
   async sendMessage(
     messages: ModelMessage[],
     onChunk?: (chunk: string) => void,
