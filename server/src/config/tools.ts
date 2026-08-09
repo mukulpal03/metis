@@ -40,36 +40,13 @@ export const availableTools: ToolConfig[] = [
     getTool: () => (google.tools as any).urlContext({}),
     enabled: false,
   },
-  {
-    id: "google_file_search",
-    name: "Google File Search",
-    description:
-      "Retrieve context from your own documents indexed in a Google File Search store, for grounded answers over private data",
-    provider: "google",
-    getTool: () =>
-      (google.tools as any).fileSearch({
-        fileSearchStoreNames: [
-          "projects/YOUR_PROJECT/locations/us/fileSearchStores/YOUR_STORE",
-        ],
-      }),
-    enabled: false,
-  },
-  {
-    id: "google_maps",
-    name: "Google Maps Grounding",
-    description:
-      "Give Gemini access to Google Maps data for location-aware responses like finding nearby places",
-    provider: "google",
-    getTool: () => (google.tools as any).googleMaps({}),
-    enabled: false,
-  },
 
   // ===================== OPENAI TOOLS =====================
   {
     id: "openai_web_search",
     name: "OpenAI Web Search",
     description:
-      "Search the web for up-to-date information and real-time answers using OpenAI search capabilities",
+      "Search the web for up-to-date information and real-time answers using OpenAI web search capabilities",
     provider: "openai",
     getTool: () => (openai.tools as any).webSearch({}),
     enabled: false,
@@ -135,11 +112,6 @@ export function getEnabledTools(
     console.error(
       chalk.red("[ERROR] Failed to initialize tools:"),
       errorMessage,
-    );
-    console.error(
-      chalk.yellow(
-        "Make sure you have @ai-sdk/google and @ai-sdk/openai installed with valid configurations.",
-      ),
     );
     return undefined;
   }

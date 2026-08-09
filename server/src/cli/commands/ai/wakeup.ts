@@ -5,6 +5,7 @@ import yoctoSpinner from "yocto-spinner";
 import { db } from "../../../lib/db";
 import { getStoredToken, isTokenExpired, requireAuth } from "../../../lib/token";
 import { startChat } from "../../chat/chat";
+import { startToolChat } from "../../chat/tool-chat";
 
 export async function wakeupAction() {
   // Ensure user is authenticated before proceeding
@@ -65,11 +66,10 @@ export async function wakeupAction() {
   }
   switch (mode) {
     case "chat":
-      await startChat("chat");
+      await startChat(undefined, "chat");
       break;
     case "tools":
-      console.log(chalk.green("\n🛠️  Tool calling is selected\n"));
-      process.exit(0);
+      await startToolChat();
       break;
     case "agentic":
       console.log(chalk.yellow("\nℹ️  Agentic mode coming soon\n"));

@@ -74,8 +74,13 @@ export class ProviderFactory {
       const modelName = requestedModel || "gpt-4o-mini";
       const openai = createOpenAI({ apiKey: config.openaiApiKey });
 
+      const model =
+        typeof openai.responses === "function"
+          ? openai.responses(modelName as any)
+          : openai(modelName);
+
       return {
-        model: openai(modelName),
+        model,
         providerName: "openai",
         modelName,
         apiKey: config.openaiApiKey,

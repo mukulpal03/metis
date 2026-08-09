@@ -48,7 +48,8 @@ export class AIService {
         messages: messages,
       };
 
-      const activeTools = tools || getEnabledTools(this.resolvedModel.providerName);
+      const activeTools =
+        tools || getEnabledTools(this.resolvedModel.providerName);
 
       if (activeTools && Object.keys(activeTools).length > 0) {
         streamConfig.tools = activeTools;
@@ -58,36 +59,32 @@ export class AIService {
       const result = streamText(streamConfig as any);
 
       let fullResponse = "";
+      const toolCalls: any[] = [];
+      const toolResults: any[] = [];
 
-      for await (const chunk of result.textStream) {
-        fullResponse += chunk;
-        if (onChunk) {
-          onChunk(chunk);
+      for await (const part of result.fullStream) {
+        switch (part.type) {
+          case "text-delta": {
+            const textDelta = part.text || (part as any).textDelta || "";
+            fullResponse += textDelta;
+            if (onChunk) {
+              onChunk(textDelta);
+            }
+            break;
+          }
+          case "tool-call":
+            toolCalls.push(part);
+            if (onToolCall) {
+              onToolCall(part);
+            }
+            break;
+          case "tool-result":
+            toolResults.push(part);
+            break;
         }
       }
-
-      const toolCalls = [];
-      const toolResults = [];
 
       const steps = await result.steps;
-
-      if (steps && Array.isArray(steps)) {
-        for (const step of steps) {
-          if (step.toolCalls && step.toolCalls.length > 0) {
-            for (const toolCall of step.toolCalls) {
-              toolCalls.push(toolCall);
-
-              if (onToolCall) {
-                onToolCall(toolCall);
-              }
-            }
-          }
-
-          if (step.toolResults && step.toolResults.length > 0) {
-            toolResults.push(...step.toolResults);
-          }
-        }
-      }
 
       return {
         content: fullResponse,
