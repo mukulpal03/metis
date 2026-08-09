@@ -28,6 +28,7 @@ export async function storeToken(token: any) {
         ? new Date(Date.now() + token.expires_in * 1000).toISOString()
         : null,
       created_at: new Date().toISOString(),
+      user: token.user || undefined,
     };
 
     await fs.writeFile(TOKEN_FILE, JSON.stringify(tokenData, null, 2), "utf-8");
@@ -66,7 +67,7 @@ export async function requireAuth() {
 
   if (!token) {
     console.log(
-      chalk.red("❌ Not authenticated. Please run 'your-cli login' first."),
+      chalk.red("❌ Not authenticated. Please run 'metis login' first."),
     );
     process.exit(1);
   }
@@ -75,7 +76,7 @@ export async function requireAuth() {
     console.log(
       chalk.yellow("⚠️  Your session has expired. Please login again."),
     );
-    console.log(chalk.gray("   Run: your-cli login\n"));
+    console.log(chalk.gray("   Run: metis login\n"));
     process.exit(1);
   }
 

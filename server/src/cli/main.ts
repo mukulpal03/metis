@@ -7,6 +7,8 @@ import figlet from "figlet";
 import boxen from "boxen";
 
 import { loginCommand } from "./commands/auth/login";
+import { logoutCommand } from "./commands/auth/logout";
+import { whoamiCommand } from "./commands/auth/whoami";
 
 async function main() {
   // Generate Figlet ASCII Logo using 'Slant' font
@@ -45,6 +47,8 @@ async function main() {
     .version("0.1.0");
 
   program.addCommand(loginCommand);
+  program.addCommand(logoutCommand);
+  program.addCommand(whoamiCommand);
      
   program.parse(process.argv);
 }

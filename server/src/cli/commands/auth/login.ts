@@ -134,16 +134,6 @@ export async function loginAction(opts?: unknown) {
     );
 
     if (token) {
-      const saved = await storeToken(token);
-      if (!saved) {
-        console.log(
-          chalk.yellow("\n⚠️  Warning: Could not save authentication token."),
-        );
-        console.log(
-          chalk.yellow("   You may need to login again on next use."),
-        );
-      }
-
       // Extract user data
       let user = (token as any).user;
       if (!user && (token as any).access_token) {
@@ -159,6 +149,46 @@ export async function loginAction(opts?: unknown) {
             user = sessionRes.data.user;
           }
         } catch (_) {}
+      }
+
+      if (!user) {
+        try {
+          const dbDeviceCode = await db.deviceCode.findFirst({
+            where: {
+              OR: [
+                { deviceCode: device_code },
+                { userCode: user_code },
+              ],
+            },
+          });
+          if (dbDeviceCode?.userId) {
+            const dbUser = await db.user.findUnique({
+              where: { id: dbDeviceCode.userId },
+            });
+            if (dbUser) {
+              user = {
+                id: dbUser.id,
+                name: dbUser.name,
+                email: dbUser.email,
+                image: dbUser.image,
+              };
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (user) {
+        (token as any).user = user;
+      }
+
+      const saved = await storeToken(token);
+      if (!saved) {
+        console.log(
+          chalk.yellow("\n⚠️  Warning: Could not save authentication token."),
+        );
+        console.log(
+          chalk.yellow("   You may need to login again on next use."),
+        );
       }
 
       // Save user to DB if user data is present
