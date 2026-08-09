@@ -48,8 +48,7 @@ export async function startChat(
     const conversation = await initConversation(user.id, conversationId, mode);
     await chatLoop(conversation);
 
-    outro(chalk.green("✨ Thanks For Chatting"));
-    process.exit(0);
+    outro(chalk.green("✨ Chat session ended"));
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error
@@ -161,7 +160,7 @@ async function initConversation(
 
 async function chatLoop(conversation: any): Promise<void> {
   const helpBox = boxen(
-    `${chalk.hex("#A6ADC8")('• Type your message and press Enter')}\n${chalk.hex("#A6ADC8")('• Markdown formatting is supported in responses')}\n${chalk.hex("#A6ADC8")('• Type "exit" to end conversation')}\n${chalk.hex("#A6ADC8")('• Press Ctrl+C to quit anytime')}`,
+    `${chalk.hex("#A6ADC8")('• Type your message and press Enter')}\n${chalk.hex("#A6ADC8")('• Markdown formatting is supported in responses')}\n${chalk.hex("#A6ADC8")('• Type "exit" or "menu" to return to main menu')}\n${chalk.hex("#A6ADC8")('• Press Ctrl+C to exit session')}`,
     {
       padding: 1,
       margin: { bottom: 1 },
@@ -184,26 +183,21 @@ async function chatLoop(conversation: any): Promise<void> {
       },
     });
 
-    // Handle cancellation (Ctrl+C)
-    if (isCancel(userInput)) {
-      const exitBox = boxen(chalk.bold.hex("#F9E2AF")("Chat session ended. Goodbye! 👋"), {
-        padding: 1,
-        margin: 1,
-        borderStyle: "round",
-        borderColor: "#F9E2AF",
-      });
-      console.log(exitBox);
-      process.exit(0);
-    }
+    const isExitCommand =
+      typeof userInput === "string" &&
+      ["exit", "menu", "/menu", "back"].includes(userInput.trim().toLowerCase());
 
-    // Handle exit command
-    if (typeof userInput === 'string' && userInput.toLowerCase() === "exit") {
-      const exitBox = boxen(chalk.bold.hex("#F9E2AF")("Chat session ended. Goodbye! 👋"), {
-        padding: 1,
-        margin: 1,
-        borderStyle: "round",
-        borderColor: "#F9E2AF",
-      });
+    // Handle cancellation (Ctrl+C) or exit command
+    if (isCancel(userInput) || isExitCommand) {
+      const exitBox = boxen(
+        chalk.bold.hex("#F9E2AF")("Chat session ended. Returning to menu... 👋"),
+        {
+          padding: 1,
+          margin: 1,
+          borderStyle: "round",
+          borderColor: "#F9E2AF",
+        }
+      );
       console.log(exitBox);
       break;
     }

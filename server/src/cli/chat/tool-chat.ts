@@ -63,7 +63,10 @@ export async function startToolChat(conversationId?: string) {
     const user = await getUserFromToken();
 
     // Select tools for interactive session
-    await selectTools();
+    const toolsConfigured = await selectTools();
+    if (!toolsConfigured) {
+      return;
+    }
 
     const conversation = await initConversation(
       user.id,
@@ -75,8 +78,7 @@ export async function startToolChat(conversationId?: string) {
     // Clean reset of tool state on session completion
     resetTools();
 
-    outro(chalk.green("✨ Thanks for using Metis Tool Mode!"));
-    process.exit(0);
+    outro(chalk.green("✨ Tool session ended"));
   } catch (error: unknown) {
     resetTools();
     const errorMessage =
@@ -175,7 +177,7 @@ async function selectTools(): Promise<boolean> {
   if (isCancel(selectedTools)) {
     cancel(chalk.hex("#F9E2AF")("Tool selection cancelled"));
     resetTools();
-    process.exit(0);
+    return false;
   }
 
   // Enable selected tools in state
@@ -209,7 +211,7 @@ async function selectTools(): Promise<boolean> {
     console.log(toolsBox);
   }
 
-  return selectedTools.length > 0;
+  return true;
 }
 
 async function initConversation(
@@ -281,7 +283,7 @@ async function chatLoop(conversation: any): Promise<void> {
   const providerInfo = aiService.getProviderInfo();
   const enabledToolNames = getEnabledToolNames(providerInfo.providerName);
   const helpBox = boxen(
-    `${chalk.hex("#A6ADC8")("• Type your message and press Enter")}\n${chalk.hex("#A6ADC8")("• Enabled tools:")} ${enabledToolNames.length > 0 ? chalk.hex("#A6E3A1")(enabledToolNames.join(", ")) : chalk.hex("#F9E2AF")("No tools")}\n${chalk.hex("#A6ADC8")('• Type "exit" to end conversation')}\n${chalk.hex("#A6ADC8")("• Press Ctrl+C to quit anytime")}`,
+    `${chalk.hex("#A6ADC8")("• Type your message and press Enter")}\n${chalk.hex("#A6ADC8")("• Enabled tools:")} ${enabledToolNames.length > 0 ? chalk.hex("#A6E3A1")(enabledToolNames.join(", ")) : chalk.hex("#F9E2AF")("No tools")}\n${chalk.hex("#A6ADC8")('• Type "exit" or "menu" to return to main menu')}\n${chalk.hex("#A6ADC8")("• Press Ctrl+C to exit session")}`,
     {
       padding: 1,
       margin: { bottom: 1 },
@@ -304,9 +306,13 @@ async function chatLoop(conversation: any): Promise<void> {
       },
     });
 
-    if (isCancel(userInput)) {
+    const isExitCommand =
+      typeof userInput === "string" &&
+      ["exit", "menu", "/menu", "back"].includes(userInput.trim().toLowerCase());
+
+    if (isCancel(userInput) || isExitCommand) {
       const exitBox = boxen(
-        chalk.bold.hex("#F9E2AF")("Tool session ended. Goodbye! 👋"),
+        chalk.bold.hex("#F9E2AF")("Tool session ended. Returning to menu... 👋"),
         {
           padding: 1,
           margin: 1,
@@ -316,20 +322,6 @@ async function chatLoop(conversation: any): Promise<void> {
       );
       console.log(exitBox);
       resetTools();
-      process.exit(0);
-    }
-
-    if (typeof userInput === "string" && userInput.toLowerCase() === "exit") {
-      const exitBox = boxen(
-        chalk.bold.hex("#F9E2AF")("Tool session ended. Goodbye! 👋"),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: "round",
-          borderColor: "#F9E2AF",
-        },
-      );
-      console.log(exitBox);
       break;
     }
 
