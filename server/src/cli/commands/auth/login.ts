@@ -126,13 +126,6 @@ export async function loginAction(opts?: unknown) {
       await open(verification_uri_complete || verification_uri);
     }
 
-    const pollSpinner = yoctoSpinner({
-      text: chalk.hex("#F9E2AF")(
-        "Waiting for user authorization in browser...",
-      ),
-    });
-    pollSpinner.start();
-
     const token = await pollForToken(
       authClient,
       device_code,
@@ -246,14 +239,16 @@ async function pollForToken(
               pollingInterval += 5;
               break;
             case "access_denied":
-              console.error("Access was denied by the user");
-              return;
+              spinner.stop();
+              cancel("Access was denied by the user.");
+              process.exit(1);
             case "expired_token":
-              console.error("The device code has expired. Please try again.");
-              return;
+              spinner.stop();
+              cancel("The device code has expired. Please try again.");
+              process.exit(1);
             default:
               spinner.stop();
-              logger.error(`Error: ${error.error_description}`);
+              cancel(`Error: ${error.error_description || error.error}`);
               process.exit(1);
           }
         }
