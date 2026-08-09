@@ -23,6 +23,7 @@ for (const envPath of envPaths) {
 import { loginCommand } from "./commands/auth/login";
 import { logoutCommand } from "./commands/auth/logout";
 import { whoamiCommand } from "./commands/auth/whoami";
+import { wakeupCommand } from "./commands/ai/wakeup";
 
 async function main() {
   // Generate Figlet ASCII Logo using 'Slant' font
@@ -63,6 +64,7 @@ async function main() {
   program.addCommand(loginCommand);
   program.addCommand(logoutCommand);
   program.addCommand(whoamiCommand);
+  program.addCommand(wakeupCommand);
      
   await program.parseAsync(process.argv);
 
