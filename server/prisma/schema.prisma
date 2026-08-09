@@ -92,5 +92,7 @@ model DeviceCode {
   clientId        String?
   scope           String?
 
+  @@index([deviceCode])
+  @@index([userCode])
   @@map("deviceCode")
 }

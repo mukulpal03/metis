@@ -1,10 +1,24 @@
 #!/usr/bin/env node
 
-import "dotenv/config";
+import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
 import { Command } from "commander";
 import chalk from "chalk";
 import figlet from "figlet";
 import boxen from "boxen";
+
+// Load environment variables once, silently — before any command runs
+const envPaths = [
+  path.join(process.cwd(), ".env"),
+  path.join(process.cwd(), "server", ".env"),
+];
+for (const envPath of envPaths) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath, quiet: true });
+    break;
+  }
+}
 
 import { loginCommand } from "./commands/auth/login";
 import { logoutCommand } from "./commands/auth/logout";
@@ -50,10 +64,21 @@ async function main() {
   program.addCommand(logoutCommand);
   program.addCommand(whoamiCommand);
      
-  program.parse(process.argv);
+  await program.parseAsync(process.argv);
+
+  // Cleanly disconnect database if it was loaded during this command.
+  // Only call disconnect if the db module was actually imported and initialized.
+  const g = globalThis as any;
+  if (g.__metis_db_loaded) {
+    try {
+      const { disconnectDb } = await import("../lib/db");
+      await disconnectDb();
+    } catch (_) {}
+  }
 }
 
 main().catch((err) => {
   console.error(chalk.red("Error: ", err));
   process.exit(1);
 });
+

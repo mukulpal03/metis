@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import fs from "fs/promises";
-import { CONFIG_DIR, TOKEN_FILE } from "../cli/commands/auth/login";
+import { CONFIG_DIR, TOKEN_FILE } from "./config";
 
 export async function getStoredToken() {
   try {
@@ -18,15 +18,25 @@ export async function storeToken(token: any) {
     // Ensure config directory exists
     await fs.mkdir(CONFIG_DIR, { recursive: true });
 
+    // Determine expiration: use expires_in if available, preserve existing
+    // expires_at if re-storing, otherwise default to 7 days
+    let expiresAt: string | null = null;
+    if (token.expires_in) {
+      expiresAt = new Date(Date.now() + token.expires_in * 1000).toISOString();
+    } else if (token.expires_at) {
+      expiresAt = token.expires_at;
+    } else {
+      // Default to 7 days if no expiration info provided
+      expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
     // Store token with metadata
     const tokenData = {
       access_token: token.access_token,
       refresh_token: token.refresh_token,
       token_type: token.token_type || "Bearer",
       scope: token.scope,
-      expires_at: token.expires_in
-        ? new Date(Date.now() + token.expires_in * 1000).toISOString()
-        : null,
+      expires_at: expiresAt,
       created_at: new Date().toISOString(),
       user: token.user || undefined,
     };
@@ -49,10 +59,19 @@ export async function clearStoredToken() {
   }
 }
 
-export async function isTokenExpired() {
-  const token = await getStoredToken();
-  if (!token || !token.expires_at) {
+/**
+ * Check if a token is expired.
+ * Accepts an optional pre-fetched token to avoid re-reading the file.
+ */
+export async function isTokenExpired(existingToken?: any) {
+  const token = existingToken ?? (await getStoredToken());
+  if (!token) {
     return true;
+  }
+
+  // If no expiration is set, treat the token as non-expired
+  if (!token.expires_at) {
+    return false;
   }
 
   const expiresAt = new Date(token.expires_at);

@@ -2,23 +2,7 @@ import { intro } from "@clack/prompts";
 import boxen from "boxen";
 import chalk from "chalk";
 import { Command } from "commander";
-import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
 import { getStoredToken, isTokenExpired, storeToken } from "../../../lib/token";
-import { db } from "../../../lib/db";
-
-const envPaths = [
-  path.join(process.cwd(), ".env"),
-  path.join(process.cwd(), "server", ".env"),
-];
-
-for (const envPath of envPaths) {
-  if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
-    break;
-  }
-}
 
 export async function whoamiAction() {
   intro(
@@ -28,7 +12,7 @@ export async function whoamiAction() {
   );
 
   const token = await getStoredToken();
-  const expired = await isTokenExpired();
+  const expired = await isTokenExpired(token);
 
   if (!token || expired) {
     console.log(
@@ -41,10 +25,11 @@ export async function whoamiAction() {
     return;
   }
 
-  // Attempt to resolve user details
+  // Attempt to resolve user details (only hit DB if token is missing user info)
   let user = token.user;
   if (!user?.email || user.email === "N/A" || user.name === "Authenticated User") {
     try {
+      const { db } = await import("../../../lib/db");
       const dbUser = await db.user.findFirst();
       if (dbUser) {
         user = {
@@ -54,19 +39,6 @@ export async function whoamiAction() {
         };
         token.user = user;
         await storeToken(token);
-      }
-    } catch (_) {}
-  } else {
-    try {
-      const dbUser = await db.user.findUnique({
-        where: { email: user.email },
-      });
-      if (dbUser) {
-        user = {
-          ...user,
-          name: dbUser.name,
-          email: dbUser.email,
-        };
       }
     } catch (_) {}
   }

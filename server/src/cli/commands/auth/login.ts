@@ -4,32 +4,17 @@ import { createAuthClient } from "better-auth/client";
 import { deviceAuthorizationClient } from "better-auth/client/plugins";
 import chalk from "chalk";
 import { Command } from "commander";
-import dotenv from "dotenv";
-import fs from "fs";
 import open from "open";
-import os from "os";
-import path from "path";
 import yoctoSpinner from "yocto-spinner";
 import { z } from "zod";
 import { getStoredToken, isTokenExpired, storeToken } from "../../../lib/token";
-import { db } from "../../../lib/db";
-
-const envPaths = [
-  path.join(process.cwd(), ".env"),
-  path.join(process.cwd(), "server", ".env"),
-];
-
-for (const envPath of envPaths) {
-  if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
-    break;
-  }
-}
+import { CONFIG_DIR, TOKEN_FILE } from "../../../lib/config";
 
 export const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:3000";
 export const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.CLIENT_ID || "";
-export const CONFIG_DIR = path.join(os.homedir(), ".better-auth");
-export const TOKEN_FILE = path.join(CONFIG_DIR, "token.json");
+
+// Re-export for backward compatibility (other modules may import from here)
+export { CONFIG_DIR, TOKEN_FILE };
 
 export async function loginAction(opts?: unknown) {
   const optionsSchema = z.object({
@@ -49,7 +34,7 @@ export async function loginAction(opts?: unknown) {
   );
 
   const existingToken = await getStoredToken();
-  const expired = await isTokenExpired();
+  const expired = await isTokenExpired(existingToken);
 
   if (existingToken && !expired) {
     const shouldReAuth = await confirm({
@@ -153,6 +138,7 @@ export async function loginAction(opts?: unknown) {
 
       if (!user) {
         try {
+          const { db } = await import("../../../lib/db");
           const dbDeviceCode = await db.deviceCode.findFirst({
             where: {
               OR: [
@@ -174,7 +160,9 @@ export async function loginAction(opts?: unknown) {
               };
             }
           }
-        } catch (_) {}
+        } catch (err: any) {
+          logger.warn(`Could not resolve user from DB: ${err.message || err}`);
+        }
       }
 
       if (user) {
@@ -194,6 +182,7 @@ export async function loginAction(opts?: unknown) {
       // Save user to DB if user data is present
       if (user && user.email) {
         try {
+          const { db } = await import("../../../lib/db");
           await db.user.upsert({
             where: { email: user.email },
             update: {
