@@ -4,6 +4,7 @@ import { Command } from "commander";
 import yoctoSpinner from "yocto-spinner";
 import { db } from "../../../lib/db";
 import { getStoredToken, isTokenExpired, requireAuth } from "../../../lib/token";
+import { startChat } from "../../chat/chat";
 
 export async function wakeupAction() {
   // Ensure user is authenticated before proceeding
@@ -62,10 +63,16 @@ export async function wakeupAction() {
     cancel("Session cancelled.");
     return;
   }
-
-  if (mode === "agentic") {
-    console.log(chalk.yellow("\nℹ️  Agentic Mode is coming soon! Stay tuned.\n"));
-    return;
+  switch (mode) {
+    case "chat":
+      await startChat("chat");
+      break;
+    case "tools":
+      console.log(chalk.green("\n🛠️  Tool calling is selected\n"));
+      break;
+    case "agentic":
+      console.log(chalk.yellow("\nℹ️  Agentic mode coming soon\n"));
+      break;
   }
 }
 

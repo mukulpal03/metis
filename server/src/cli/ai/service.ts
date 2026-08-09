@@ -43,11 +43,13 @@ export class AIService {
     onToolCall: ((toolCall: unknown) => void) | null = null,
   ): Promise<AIServiceResponse> {
     try {
-      const result = streamText({
+      const streamConfig = {
         model: this.model,
-        messages,
+        messages: messages,
         ...(tools ? { tools } : {}),
-      });
+      };
+
+      const result = streamText(streamConfig as any);
 
       let fullResponse = "";
 
