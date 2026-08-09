@@ -18,9 +18,11 @@
   "license": "ISC",
   "packageManager": "pnpm@10.33.2",
   "dependencies": {
+    "@ai-sdk/google": "^4.0.39",
     "@clack/prompts": "^1.7.0",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
+    "ai": "^7.0.58",
     "better-auth": "^1.6.26",
     "boxen": "^8.0.1",
     "chalk": "^6.0.0",
