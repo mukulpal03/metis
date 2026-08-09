@@ -12,6 +12,9 @@ export interface AIServiceResponse {
   content: string;
   finishReason: FinishReason;
   usage: LanguageModelUsage;
+  toolCalls?: any[];
+  toolResults?: any[];
+  steps?: any[];
 }
 
 export class AIService {
@@ -32,17 +35,21 @@ export class AIService {
     messages: ModelMessage[],
     onChunk?: (chunk: string) => void,
     tools?: ToolSet,
-    _onToolCall: ((toolCall: unknown) => void) | null = null,
+    onToolCall: ((toolCall: unknown) => void) | null = null,
   ): Promise<AIServiceResponse> {
     try {
       const systemPrompt = `You are Metis, an intelligent AI-powered developer assistant. You are currently powered by ${this.resolvedModel.providerName.toUpperCase()} (${this.resolvedModel.modelName}).`;
 
-      const streamConfig = {
+      const streamConfig: Record<string, any> = {
         model: this.resolvedModel.model,
         system: systemPrompt,
         messages: messages,
-        ...(tools ? { tools } : {}),
       };
+
+      if (tools && Object.keys(tools).length > 0) {
+        streamConfig.tools = tools;
+        streamConfig.maxSteps = 5; // Allow up to 5 tool call steps
+      }
 
       const result = streamText(streamConfig as any);
 
@@ -55,10 +62,36 @@ export class AIService {
         }
       }
 
+      const toolCalls = [];
+      const toolResults = [];
+
+      const steps = await result.steps;
+
+      if (steps && Array.isArray(steps)) {
+        for (const step of steps) {
+          if (step.toolCalls && step.toolCalls.length > 0) {
+            for (const toolCall of step.toolCalls) {
+              toolCalls.push(toolCall);
+
+              if (onToolCall) {
+                onToolCall(toolCall);
+              }
+            }
+          }
+
+          if (step.toolResults && step.toolResults.length > 0) {
+            toolResults.push(...step.toolResults);
+          }
+        }
+      }
+
       return {
         content: fullResponse,
         finishReason: await result.finishReason,
         usage: await result.usage,
+        toolCalls,
+        toolResults,
+        steps: steps || [],
       };
     } catch (error: unknown) {
       const formattedMessage = ProviderFactory.formatError(
@@ -77,18 +110,8 @@ export class AIService {
     }
   }
 
-  async getMessage(
-    messages: ModelMessage[],
-    tools?: ToolSet,
-  ): Promise<string> {
-    let fullResponse = "";
-    await this.sendMessage(
-      messages,
-      (chunk) => {
-        fullResponse += chunk;
-      },
-      tools,
-    );
-    return fullResponse;
+  async getMessage(messages: ModelMessage[], tools?: ToolSet): Promise<string> {
+    const result = await this.sendMessage(messages, undefined, tools);
+    return result.content;
   }
 }

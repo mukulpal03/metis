@@ -20,3 +20,6 @@ export const geminiApiKey = config.googleApiKey;
 export const geminiModelName = config.model || "gemini-2.5-flash";
 export const openaiApiKey = config.openaiApiKey;
 export const openaiModelName = config.model || "gpt-4o-mini";
+
+export * from "./tools";
+
