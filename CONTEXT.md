@@ -103,20 +103,20 @@ The CLI is built with **Commander.js**, styled with **Chalk**, **Figlet** (ASCII
 - **Storage**: `~/.better-auth/token.json` (JSON with `access_token`, `refresh_token`, `token_type`, `scope`, `expires_at`, `created_at`, `user`).
 - **Functions**: `getStoredToken()`, `storeToken()`, `clearStoredToken()`, `isTokenExpired()` (5-min buffer), `requireAuth()` (guard for protected CLI commands).
 
-### AI Service (`cli/ai/service.ts`)
-- Uses **Vercel AI SDK** (`ai` package) with **`@ai-sdk/google`** provider (Gemini).
-- `AIService` class with two methods:
-  - `sendMessage(messages, onChunk?, tools?, onToolCall?)` — streams a response, returns `{ content, finishReason, usage }`.
-  - `getMessage(messages, tools?)` — convenience wrapper that collects the full response string.
-- Configured via `config/index.ts`: reads `GOOGLE_GENERATIVE_AI_API_KEY` and `METIS_MODEL` (defaults to `gemini-2.5-flash`).
+### AI Service & Providers (`cli/ai/service.ts` & `cli/ai/providers.ts`)
+- Uses **Vercel AI SDK** (`ai` package) with support for **`@ai-sdk/google`** (Gemini) and **`@ai-sdk/openai`** providers.
+- **ProviderFactory**: Dynamically resolves the AI model and provider based on environment configurations (`AI_PROVIDER`, `GOOGLE_GENERATIVE_AI_API_KEY`, `OPENAI_API_KEY`). Handles API quota/rate-limiting errors gracefully with user-friendly fallback suggestions.
+- `AIService` class streams responses using `streamText` and collects text via `generateText`.
+- **Tool Calling** (`config/tools.ts`): Integrated support for tools like Web Search (Google/OpenAI), Code Execution, and URL Context. These tools are dynamically injected into the stream context.
 
-### Wakeup Command (`metis wakeup`)
+### Wakeup Command (`metis wakeup` & `cli/chat/chat.ts`)
 - Requires authentication (`requireAuth()`).
-- Fetches user info from the database.
+- Fetches user info from the database and initializes a `ChatService` session.
 - Presents an interactive mode selector:
-  - **💬 Chat with Metis** — Conversational AI mode
-  - **🛠️ Tool Calling** — Web search, code execution, etc.
-  - **🤖 Agentic Mode** — Coming soon placeholder
+  - **💬 Chat with Metis** — Conversational AI mode with support for returning to the main menu ("exit", "menu", "back"). Markdown formatting and AI streaming via `yocto-spinner` are fully supported.
+  - **🛠️ Tool Calling** — Interactive selector for enabling tools like Web Search and Code Execution before starting a chat session.
+  - **🤖 Agentic Mode** — Coming soon placeholder.
+- **Interactive Menu Navigation**: Users can seamlessly back out from active chat sessions to the main mode selector.
 
 ---
 
@@ -196,7 +196,9 @@ GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 FRONTEND_URL=http://localhost:3001
 GOOGLE_GENERATIVE_AI_API_KEY=...
+OPENAI_API_KEY=...                  # Optional, used if AI_PROVIDER=openai
 METIS_MODEL=gemini-2.5-flash        # Optional, defaults to gemini-2.5-flash
+AI_PROVIDER=auto                    # Options: google, openai, auto
 ```
 
 ### Frontend (`client/.env`)
