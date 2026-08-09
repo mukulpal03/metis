@@ -1,7 +1,7 @@
 # Metis Project Context & Architecture Documentation
 
 ## Overview
-**Metis** is a monorepo project comprising a **Next.js frontend client** and an **Express.js backend server** with **Better-Auth** authentication, **Prisma ORM**, and **Neon PostgreSQL**. It powers both the Metis Web Platform and Metis CLI developer workflows.
+**Metis** is a monorepo project comprising a **Next.js frontend client** and an **Express.js backend server** with **Better-Auth** authentication, **Prisma ORM**, and **Neon PostgreSQL**. It powers both the **Metis Web Platform** (dashboard, device approval pages) and the **Metis CLI** — an AI-powered developer assistant with Google OAuth device-flow authentication and a Gemini-backed conversational AI.
 
 ---
 
@@ -9,34 +9,60 @@
 
 ```
 metis/
-├── client/                 # Next.js 16 App Router Frontend
+├── client/                         # Next.js 16 App Router Frontend
 │   ├── app/
-│   │   ├── (auth)/         # Auth Route Group
-│   │   │   ├── layout.tsx  # Auth group layout
-│   │   │   └── sign-in/    # Sign In page (Protected against logged-in users)
-│   │   │       └── page.tsx
-│   │   ├── globals.css     # Design system & CSS tokens
-│   │   ├── layout.tsx      # Root Layout
-│   │   └── page.tsx        # Home Dashboard (Protected, session check & user profile)
+│   │   ├── (auth)/                 # Auth Route Group
+│   │   │   ├── layout.tsx          # Auth group layout
+│   │   │   └── sign-in/
+│   │   │       └── page.tsx        # Sign In page (Protected against logged-in users)
+│   │   ├── approve/
+│   │   │   └── page.tsx            # Device authorization approval page
+│   │   ├── device/
+│   │   │   ├── approve/
+│   │   │   │   └── (page)          # Device code approval sub-route
+│   │   │   └── page.tsx            # Device code entry/redirect page
+│   │   ├── globals.css             # Design system & CSS tokens
+│   │   ├── layout.tsx              # Root Layout
+│   │   └── page.tsx                # Home Dashboard (Protected, session check & user profile)
 │   ├── components/
-│   │   ├── ui/             # Shadcn UI primitives (button, card, input, label, separator)
-│   │   └── login-form.tsx  # Metis CLI styled Google OAuth Login Form
+│   │   ├── ui/                     # Shadcn UI primitives (button, card, input, label, separator)
+│   │   └── login-form.tsx          # Metis CLI styled Google OAuth Login Form
 │   ├── lib/
-│   │   └── auth-client.ts  # Better-Auth client instance
-│   ├── .env                # Client environment variables (NEXT_PUBLIC_BETTER_AUTH_URL)
-│   └── package.json        # Next.js scripts (runs on port 3001)
+│   │   └── auth-client.ts          # Better-Auth client instance
+│   ├── .env                        # Client environment variables
+│   └── package.json                # Next.js scripts (runs on port 3001)
 │
-├── server/                 # Express 5.x Backend API & Auth Server
+├── server/                         # Express 5.x Backend API, Auth Server & CLI
 │   ├── prisma/
-│   │   └── schema.prisma   # PostgreSQL Schema (User, Session, Account, Verification)
+│   │   └── schema.prisma           # PostgreSQL Schema (User, Session, Account, Verification, DeviceCode)
 │   ├── src/
+│   │   ├── cli/                    # Metis CLI Application
+│   │   │   ├── main.ts             # CLI entry point (Commander, ASCII banner, command registration)
+│   │   │   ├── ai/
+│   │   │   │   └── service.ts      # AIService class (Gemini via Vercel AI SDK, streaming)
+│   │   │   └── commands/
+│   │   │       ├── auth/
+│   │   │       │   ├── login.ts    # `metis login`  — Device Authorization OAuth flow
+│   │   │       │   ├── logout.ts   # `metis logout` — Clear stored token
+│   │   │       │   └── whoami.ts   # `metis whoami` — Display authenticated user profile
+│   │   │       └── ai/
+│   │   │           └── wakeup.ts   # `metis wakeup` — Wake up Metis AI (chat, tools, agentic modes)
+│   │   ├── config/
+│   │   │   ├── index.ts            # Centralized config (Google API key, model name)
+│   │   │   └── gemini.ts           # Re-export alias for config
 │   │   ├── lib/
-│   │   │   ├── auth.ts     # Better-Auth server configuration (Prisma, Google OAuth, device authorization)
-│   │   │   └── db.ts       # Prisma Client database instance
-│   │   └── index.ts        # Express entry point & middleware (/api/auth/*splat)
-│   ├── .env                # Server environment variables (PORT, BETTER_AUTH_URL, GOOGLE_CLIENT_ID, etc.)
-│   └── package.json        # Express server scripts (runs on port 3000)
-└── CONTEXT.md              # Project architecture & development context
+│   │   │   ├── auth.ts             # Better-Auth server configuration (Prisma, Google OAuth, device auth plugin)
+│   │   │   ├── config.ts           # CLI filesystem paths (CONFIG_DIR, TOKEN_FILE)
+│   │   │   ├── db.ts               # Prisma Client with pg adapter, lazy loading, clean disconnect
+│   │   │   └── token.ts            # Token management (store, read, clear, expiry check, requireAuth)
+│   │   ├── routes/
+│   │   │   └── device.routes.ts    # GET /device — redirects device code auth from backend → frontend
+│   │   └── index.ts                # Express entry point & middleware (/api/auth/*splat, CORS, device routes)
+│   ├── .env                        # Server environment variables
+│   └── package.json                # Express + CLI scripts (bin: metis → dist/cli/main.js)
+│
+├── CONTEXT.md                      # Project architecture & development context (this file)
+└── .gitignore
 ```
 
 ---
@@ -50,11 +76,55 @@ metis/
 
 ---
 
+## Metis CLI
+
+### Overview
+The CLI is built with **Commander.js**, styled with **Chalk**, **Figlet** (ASCII banner), **Boxen** (framed output), and uses **@clack/prompts** for interactive UI. It is registered as a binary (`metis`) in `server/package.json`.
+
+### Commands
+
+| Command | File | Description |
+|---|---|---|
+| `metis login` | `cli/commands/auth/login.ts` | Authenticate via OAuth Device Authorization flow |
+| `metis logout` | `cli/commands/auth/logout.ts` | Clear stored authentication token |
+| `metis whoami` | `cli/commands/auth/whoami.ts` | Display current user's session profile (name, email, token, expiry) |
+| `metis wakeup` | `cli/commands/ai/wakeup.ts` | Wake up Metis AI — select between Chat, Tool Calling, and Agentic modes |
+
+### CLI Authentication Flow (`metis login`)
+1. Requests a **device code** from the backend (`POST /device/code`) via Better-Auth's `deviceAuthorization` plugin.
+2. Displays a **user code** and **verification URL** in the terminal.
+3. Optionally opens the browser to the verification URL.
+4. **Polls** the backend (`device.token`) until the user approves the device in the browser.
+5. On approval, resolves the user identity (via session API or direct DB lookup on `DeviceCode.userId`).
+6. **Stores** the token + user data to `~/.better-auth/token.json`.
+7. **Upserts** the user record in the database.
+
+### Token Management (`lib/token.ts` + `lib/config.ts`)
+- **Storage**: `~/.better-auth/token.json` (JSON with `access_token`, `refresh_token`, `token_type`, `scope`, `expires_at`, `created_at`, `user`).
+- **Functions**: `getStoredToken()`, `storeToken()`, `clearStoredToken()`, `isTokenExpired()` (5-min buffer), `requireAuth()` (guard for protected CLI commands).
+
+### AI Service (`cli/ai/service.ts`)
+- Uses **Vercel AI SDK** (`ai` package) with **`@ai-sdk/google`** provider (Gemini).
+- `AIService` class with two methods:
+  - `sendMessage(messages, onChunk?, tools?, onToolCall?)` — streams a response, returns `{ content, finishReason, usage }`.
+  - `getMessage(messages, tools?)` — convenience wrapper that collects the full response string.
+- Configured via `config/index.ts`: reads `GOOGLE_GENERATIVE_AI_API_KEY` and `METIS_MODEL` (defaults to `gemini-2.5-flash`).
+
+### Wakeup Command (`metis wakeup`)
+- Requires authentication (`requireAuth()`).
+- Fetches user info from the database.
+- Presents an interactive mode selector:
+  - **💬 Chat with Metis** — Conversational AI mode
+  - **🛠️ Tool Calling** — Web search, code execution, etc.
+  - **🤖 Agentic Mode** — Coming soon placeholder
+
+---
+
 ## Key Authentication Setup Details
 
 ### 1. Backend Authentication (`server/src/lib/auth.ts`)
 - Configured using **Better-Auth** with `prismaAdapter`.
-- **Plugins**: `deviceAuthorization()` enabled for CLI authentication flow.
+- **Plugins**: `deviceAuthorization({ expiresIn: "30m", interval: "5s" })` enabled for CLI authentication flow.
 - **Trusted Origins**: Includes `http://localhost:3001`, `http://127.0.0.1:3001`, and `process.env.FRONTEND_URL`.
 - **Google Social Provider**: Configured with `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 - **Express Route Handling** (`server/src/index.ts`):
@@ -73,7 +143,34 @@ metis/
 - **Sign-In Page (`client/app/(auth)/sign-in/page.tsx`)**:
   - Checks active session via `authClient.useSession()`.
   - Redirects already-authenticated users to `/`.
-  - Displays `LoginForm` with Google Social Sign-In (`authClient.signIn.social({ provider: "google", callbackURL: `${window.location.origin}/` })`).
+  - Displays `LoginForm` with Google Social Sign-In (`authClient.signIn.social({ provider: "google", callbackURL: ... })`).
+
+### 4. Device Authorization Pages (Frontend)
+- **`/device`** — Device code entry / redirect page for CLI auth flow.
+- **`/approve`** — Device authorization approval page where the user confirms the CLI device code.
+- **Backend route** (`GET /device`) in `device.routes.ts` redirects from the backend to the frontend with the `user_code` query parameter.
+
+---
+
+## Database
+
+### Prisma Schema (`server/prisma/schema.prisma`)
+**Provider**: PostgreSQL (Neon) via `@prisma/adapter-pg`
+
+| Model | Purpose |
+|---|---|
+| `User` | User profile (id, name, email, emailVerified, image, timestamps) |
+| `Session` | Auth sessions (token, expiresAt, ipAddress, userAgent, linked to User) |
+| `Account` | OAuth accounts (providerId, accountId, accessToken, refreshToken, linked to User) |
+| `Verification` | Email/identity verification records |
+| `DeviceCode` | Device authorization codes (deviceCode, userCode, userId, status, expiresAt, pollingInterval) |
+
+### Database Client (`server/src/lib/db.ts`)
+- Uses **`@prisma/adapter-pg`** with a `pg.Pool` for connection management.
+- **Lazy loading**: Sets `globalThis.__metis_db_loaded` flag so the CLI entry point knows whether to disconnect.
+- **Clean disconnect**: `disconnectDb()` disconnects both Prisma and the underlying pg pool (critical for CLI commands to exit cleanly).
+- **SSL handling**: Rewrites `sslmode=require` → `sslmode=verify-full`, suppresses TLS warnings.
+- **Pool config**: `max: 5`, `connectionTimeoutMillis: 10000`, `idleTimeoutMillis: 5000`.
 
 ---
 
@@ -98,9 +195,36 @@ BETTER_AUTH_URL=http://localhost:3000
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 FRONTEND_URL=http://localhost:3001
+GOOGLE_GENERATIVE_AI_API_KEY=...
+METIS_MODEL=gemini-2.5-flash        # Optional, defaults to gemini-2.5-flash
 ```
 
 ### Frontend (`client/.env`)
 ```env
 NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 ```
+
+---
+
+## Key Dependencies
+
+### Server
+| Package | Purpose |
+|---|---|
+| `express` (v5) | HTTP server |
+| `better-auth` | Authentication framework (Google OAuth, device authorization) |
+| `@prisma/client` + `@prisma/adapter-pg` | Database ORM with PostgreSQL adapter |
+| `pg` | PostgreSQL connection pool |
+| `commander` | CLI framework |
+| `@clack/prompts` | Interactive CLI prompts |
+| `chalk`, `figlet`, `boxen` | CLI styling and ASCII art |
+| `yocto-spinner` | CLI loading spinners |
+| `ai` + `@ai-sdk/google` | Vercel AI SDK with Google Gemini provider |
+| `open` | Opens URLs in the user's browser |
+| `zod` | Schema validation |
+| `dotenv` | Environment variable loading |
+| `tsup` | Build tool for ESM bundles |
+| `tsx` | TypeScript execution for development |
+
+### Client
+- `next` (v16), `react`, Shadcn UI, `better-auth` client
