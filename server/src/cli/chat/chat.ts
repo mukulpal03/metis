@@ -49,6 +49,7 @@ export async function startChat(
     await chatLoop(conversation);
 
     outro(chalk.green("✨ Thanks For Chatting"));
+    process.exit(0);
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error
@@ -127,9 +128,13 @@ async function initConversation(
     } else {
       spinner.success(`Started new conversation: ${chalk.bold.cyan(conversation.id)}`);
     }
+
+    const { providerName, modelName } = aiService.getProviderInfo();
+    const providerBadge = `${providerName.toUpperCase()} (${modelName})`;
+
     // Display conversation info in a box
     const conversationInfo = boxen(
-      `${chalk.bold("Conversation")}: ${conversation.title}\n${chalk.gray("ID: " + conversation.id)}\n${chalk.gray("Mode: " + conversation.mode)}`,
+      `${chalk.bold("Conversation")}: ${conversation.title}\n${chalk.gray("ID: " + conversation.id)}\n${chalk.gray("Mode: " + conversation.mode)}\n${chalk.gray("Provider: ")} ${chalk.bold.cyan(providerBadge)}`,
       {
         padding: 1,
         margin: { top: 1, bottom: 1 },
@@ -218,16 +223,34 @@ async function chatLoop(conversation: any): Promise<void> {
     // Get messages count before AI response
     const messages = await chatService.getMessages(conversation.id);
     
-    // Get AI response (streams directly to console)
-    const aiResponse = await getAIResponse(conversation.id, spinner);
+    try {
+      // Get AI response (streams directly to console)
+      const aiResponse = await getAIResponse(conversation.id, spinner);
 
-    // Save AI response in background to prevent UI block
-    saveMessage(conversation.id, "assistant", aiResponse).catch(() => {});
+      if (aiResponse) {
+        // Save AI response in background to prevent UI block
+        saveMessage(conversation.id, "assistant", aiResponse).catch(() => {});
+      }
 
-    // Update title in background if first exchange
-    if (messages.length === 0 || messages.length === 1) {
-      const title = (userInput as string).slice(0, 50) + ((userInput as string).length > 50 ? "..." : "");
-      updateConversationTitle(conversation.id, title, conversation.userId).catch(() => {});
+      // Update title in background if first exchange
+      if (messages.length === 0 || messages.length === 1) {
+        const title = (userInput as string).slice(0, 50) + ((userInput as string).length > 50 ? "..." : "");
+        updateConversationTitle(conversation.id, title, conversation.userId).catch(() => {});
+      }
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.log(
+        boxen(
+          chalk.red.bold("⚠️ AI Response Failed\n\n") + chalk.white(errorMsg),
+          {
+            padding: 1,
+            margin: { top: 1, bottom: 1 },
+            borderStyle: "round",
+            borderColor: "red",
+            title: "❌ Error",
+          }
+        )
+      );
     }
   }
 }

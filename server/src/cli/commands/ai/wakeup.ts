@@ -61,7 +61,7 @@ export async function wakeupAction() {
 
   if (isCancel(mode)) {
     cancel("Session cancelled.");
-    return;
+    process.exit(0);
   }
   switch (mode) {
     case "chat":
@@ -69,9 +69,11 @@ export async function wakeupAction() {
       break;
     case "tools":
       console.log(chalk.green("\n🛠️  Tool calling is selected\n"));
+      process.exit(0);
       break;
     case "agentic":
       console.log(chalk.yellow("\nℹ️  Agentic mode coming soon\n"));
+      process.exit(0);
       break;
   }
 }

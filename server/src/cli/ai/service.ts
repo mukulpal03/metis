@@ -1,14 +1,12 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import {
   streamText,
   type FinishReason,
-  type LanguageModel,
   type LanguageModelUsage,
   type ModelMessage,
   type ToolSet,
 } from "ai";
 import chalk from "chalk";
-import { config } from "../../config";
+import { ProviderFactory, type ResolvedModel } from "./providers";
 
 export interface AIServiceResponse {
   content: string;
@@ -17,34 +15,31 @@ export interface AIServiceResponse {
 }
 
 export class AIService {
-  private model: LanguageModel;
+  private resolvedModel: ResolvedModel;
 
-  constructor() {
-    if (!config.googleApiKey) {
-      console.log(
-        chalk.red(
-          "\n❌ AI Configuration Error: GOOGLE_GENERATIVE_AI_API_KEY is not set in environment.\n",
-        ),
-      );
-      throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not set in env");
-    }
+  constructor(provider?: string, model?: string) {
+    this.resolvedModel = ProviderFactory.getModel(provider, model);
+  }
 
-    const google = createGoogleGenerativeAI({
-      apiKey: config.googleApiKey,
-    });
-
-    this.model = google(config.model);
+  public getProviderInfo(): { providerName: string; modelName: string } {
+    return {
+      providerName: this.resolvedModel.providerName,
+      modelName: this.resolvedModel.modelName,
+    };
   }
 
   async sendMessage(
     messages: ModelMessage[],
     onChunk?: (chunk: string) => void,
     tools?: ToolSet,
-    onToolCall: ((toolCall: unknown) => void) | null = null,
+    _onToolCall: ((toolCall: unknown) => void) | null = null,
   ): Promise<AIServiceResponse> {
     try {
+      const systemPrompt = `You are Metis, an intelligent AI-powered developer assistant. You are currently powered by ${this.resolvedModel.providerName.toUpperCase()} (${this.resolvedModel.modelName}).`;
+
       const streamConfig = {
-        model: this.model,
+        model: this.resolvedModel.model,
+        system: systemPrompt,
         messages: messages,
         ...(tools ? { tools } : {}),
       };
@@ -60,25 +55,25 @@ export class AIService {
         }
       }
 
-      const fullResult = result;
-
       return {
         content: fullResponse,
-        finishReason: await fullResult.finishReason,
-        usage: await fullResult.usage,
+        finishReason: await result.finishReason,
+        usage: await result.usage,
       };
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error || "Unknown AI error");
+      const formattedMessage = ProviderFactory.formatError(
+        error,
+        this.resolvedModel.providerName,
+      );
 
       console.log(
         chalk.red("\n❌ AI Response Error:") +
-          " " +
-          chalk.bold.white(errorMessage) +
+          "\n" +
+          chalk.bold.yellow(formattedMessage) +
           "\n",
       );
 
-      throw error;
+      throw new Error(formattedMessage);
     }
   }
 
